@@ -44,7 +44,7 @@ def process_dataset(json_path, train_rate):
 
 if __name__ == '__main__':
     print('## preprocess.py: Begin to load the data...')
-    clock1 = time.clock()
+    start_time = time.perf_counter()
     process_dataset('data/music/Digital_Music_5.json', train_rate=0.8)
-    clock2 = time.clock()
-    print(f'## preprocess.py: Data loading complete! Time used {int(clock2 - clock1)} seconds.')
+    end_time = time.perf_counter()
+    print(f'## preprocess.py: Data loading complete! Time used {end_time - start_time:.0f} seconds.')

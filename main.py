@@ -1,3 +1,4 @@
+import os
 import time
 
 import torch
@@ -28,7 +29,7 @@ def train(train_dataloader, valid_dataloader, model, config, model_path):
     train_mse = predicting(model, train_dataloader)
     valid_mse = predicting(model, valid_dataloader)
     print(f'{date()}## Start the training! Initial train mse {train_mse:.6f}, validation mse {valid_mse:.6f}')
-    start_time = time.clock()
+    start_time = time.perf_counter()
 
     opt = torch.optim.Adam(model.parameters(), config.learning_rate, weight_decay=config.l2_regularization)
     torch.optim.lr_scheduler.ExponentialLR(opt, config.learning_rate_decay)
@@ -57,18 +58,18 @@ def train(train_dataloader, valid_dataloader, model, config, model_path):
             best_loss = valid_mse
             torch.save(model, model_path)
 
-    end_time = time.clock()
+    end_time = time.perf_counter()
     print(f'{date()}## End of training! Time used {end_time - start_time:.0f} seconds.')
 
 
 def test(dataloader, model_path):
     print(f'{date()}## Start the testing!')
-    start_time = time.clock()
+    start_time = time.perf_counter()
 
     best_model = torch.load(model_path)
     test_loss = predicting(best_model, dataloader)
 
-    end_time = time.clock()
+    end_time = time.perf_counter()
     print(f"{date()}## Test end, test ems is {test_loss:.6f}, time used {end_time - start_time:.0f} seconds.")
 
 
@@ -88,5 +89,6 @@ if __name__ == '__main__':
     model = DeepCoNN(config, word2vec).to(config.device)
     # model = torch.load('model/best_model.pt')  # 继续训练以前的模型
     del word2vec  # 节省空间
+    os.makedirs('model',exist_ok=True)  # 文件夹不存在则创建
     train(train_dataloader, valid_dataloader, model, config, 'model/best_model.pt')
     test(test_dataloader, 'model/best_model.pt')
