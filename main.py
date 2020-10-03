@@ -89,6 +89,6 @@ if __name__ == '__main__':
     model = DeepCoNN(config, word2vec).to(config.device)
     # model = torch.load('model/best_model.pt')  # 继续训练以前的模型
     del word2vec  # 节省空间
-    os.makedirs('model',exist_ok=True)  # 文件夹不存在则创建
+    os.makedirs('model', exist_ok=True)  # 文件夹不存在则创建
     train(train_dataloader, valid_dataloader, model, config, 'model/best_model.pt')
     test(test_dataloader, 'model/best_model.pt')

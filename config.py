@@ -2,8 +2,8 @@ import torch
 
 
 class Config:
-    device = torch.device("cuda:0")
-    # device = torch.device("cpu")
+    # device = torch.device("cuda:0")
+    device = torch.device("cpu")
 
     train_epochs = 20
     batch_size = 100
