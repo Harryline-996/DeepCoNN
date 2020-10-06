@@ -8,7 +8,7 @@ from nltk.tokenize import WordPunctTokenizer
 def process_dataset(json_path, train_rate):
     # 从原始json文件提取有用信息，划分为训练集、验证集、测试集
     print('## Read the json file...')
-    df = pd.read_json(json_path, lines=True, nrows=None)
+    df = pd.read_json(json_path, lines=True)
     df = df[['reviewerID', 'asin', 'reviewText', 'overall']]
     df.columns = ['userID', 'itemID', 'review', 'rating']
     # 将用户/物品id映射为数字
