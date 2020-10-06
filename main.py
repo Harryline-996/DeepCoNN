@@ -26,9 +26,10 @@ def predicting(model, dataloader):
 
 
 def train(train_dataloader, valid_dataloader, model, config, model_path):
+    print(f'{date()}## Start the training!')
     train_mse = predicting(model, train_dataloader)
     valid_mse = predicting(model, valid_dataloader)
-    print(f'{date()}## Start the training! Initial train mse {train_mse:.6f}, validation mse {valid_mse:.6f}')
+    print(f'{date()}#### Initial train mse {train_mse:.6f}, validation mse {valid_mse:.6f}')
     start_time = time.perf_counter()
 
     opt = torch.optim.Adam(model.parameters(), config.learning_rate, weight_decay=config.l2_regularization)
