@@ -9,12 +9,14 @@ class DeepCoNNDataset(Dataset):
         self.word2vec = word2vec
         self.config = config
         self.PAD_WORD_idx = self.word2vec.vocab[self.config.PAD_WORD].index
+
         df = pd.read_csv(data_path, header=None, names=['userID', 'itemID', 'review', 'rating'])
         df['review'] = df['review'].apply(self._review2id)  # 分词->数字
         self.null_idx = set()  # 暂存空样本的下标，最后删除他们
-        user_reviews = self._get_user_reviews(df)  # 收集每个user的评论列表
-        item_reviews = self._get_item_reviews(df)
+        user_reviews = self._get_reviews(df)  # 收集每个user的评论列表
+        item_reviews = self._get_reviews(df, 'itemID', 'userID')
         rating = torch.Tensor(df['rating'].to_list()).view(-1, 1)
+
         self.user_reviews = user_reviews[[idx for idx in range(user_reviews.shape[0]) if idx not in self.null_idx]]
         self.item_reviews = item_reviews[[idx for idx in range(item_reviews.shape[0]) if idx not in self.null_idx]]
         self.rating = rating[[idx for idx in range(rating.shape[0]) if idx not in self.null_idx]]
@@ -25,39 +27,25 @@ class DeepCoNNDataset(Dataset):
     def __len__(self):
         return self.rating.shape[0]
 
-    def _get_user_reviews(self, df):
+    def _get_reviews(self, df, lead='userID', costar='itemID'):
         # 对于每条训练数据，生成用户的所有评论汇总
-        reviews_by_user = dict(list(df[['itemID', 'review']].groupby(df['userID'])))  # 每个用户的评论汇总
-        user_reviews = []
-        for idx, (uid, iid) in enumerate(zip(df['userID'], df['itemID'])):
-            reviews = reviews_by_user[uid]  # 取出uid的所有评论：DataFrame
-            reviews = reviews['review'][reviews['itemID'] != iid].to_list()  # 获取uid除了对当前item外的所有评论：列表
-            if len(reviews) < 5:
-                self.null_idx.add(idx)  # mark the index of null sample
-            reviews = self._adjust_review_list(reviews, self.config.review_length, self.config.review_count)
-            user_reviews.append(reviews)
-        return torch.LongTensor(user_reviews)
-
-    def _get_item_reviews(self, df):
-        # 与get_user_reviews()同理
-        reviews_by_item = dict(list(df[['userID', 'review']].groupby(df['itemID'])))  # 每个item的评论汇总
-        item_reviews = []
-        for idx, (uid, iid) in enumerate(zip(df['userID'], df['itemID'])):
-            reviews = reviews_by_item[iid]  # 取出item的所有评论：DataFrame
-            reviews = reviews['review'][reviews['userID'] != uid].to_list()  # 获取item除当前user外的所有评论：列表
+        reviews_by_lead = dict(list(df[[costar, 'review']].groupby(df[lead])))  # 每个user/item评论汇总
+        lead_reviews = []
+        for idx, (lead_id, costar_id) in enumerate(zip(df[lead], df[costar])):
+            df_data = reviews_by_lead[lead_id]  # 取出lead的所有评论：DataFrame
+            reviews = df_data['review'][df_data[costar] != costar_id].to_list()  # 取lead除对当前costar外的评论：列表
             if len(reviews) < 5:
                 self.null_idx.add(idx)
             reviews = self._adjust_review_list(reviews, self.config.review_length, self.config.review_count)
-            item_reviews.append(reviews)
-        return torch.LongTensor(item_reviews)
+            lead_reviews.append(reviews)
+        return torch.LongTensor(lead_reviews)
 
     def _adjust_review_list(self, reviews, r_length, r_count):
         reviews = reviews[:r_count] + [[self.PAD_WORD_idx] * r_length] * (r_count - len(reviews))  # 评论数量固定
         reviews = [r[:r_length] + [0] * (r_length - len(r)) for r in reviews]  # 每条评论定长
         return reviews
 
-    def _review2id(self, review):
-        #  将一个评论字符串分词并转为数字
+    def _review2id(self, review):  #  将一个评论字符串分词并转为数字
         if not isinstance(review, str):
             return []  # 貌似pandas的一个bug，读取出来的评论如果是空字符串，review类型会变成float
         wids = []
