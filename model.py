@@ -5,9 +5,10 @@ from torch.utils.data import Dataset
 
 
 class DeepCoNNDataset(Dataset):
-    def __init__(self, data_path, word2vec, config):
+    def __init__(self, data_path, word2vec, config, retain_rui=True):
         self.word2vec = word2vec
         self.config = config
+        self.retain_rui = retain_rui  # 是否在最终样本中，保留user和item的公共review
         self.PAD_WORD_idx = self.word2vec.vocab[self.config.PAD_WORD].index
 
         df = pd.read_csv(data_path, header=None, names=['userID', 'itemID', 'review', 'rating'])
@@ -33,7 +34,10 @@ class DeepCoNNDataset(Dataset):
         lead_reviews = []
         for idx, (lead_id, costar_id) in enumerate(zip(df[lead], df[costar])):
             df_data = reviews_by_lead[lead_id]  # 取出lead的所有评论：DataFrame
-            reviews = df_data['review'][df_data[costar] != costar_id].to_list()  # 取lead除对当前costar外的评论：列表
+            if self.retain_rui:
+                reviews = df_data['review'].to_list()  # 取lead所有评论：列表
+            else:
+                reviews = df_data['review'][df_data[costar] != costar_id].to_list()  # 不含lead与costar的公共评论
             if len(reviews) < 5:
                 self.null_idx.add(idx)
             reviews = self._adjust_review_list(reviews, self.config.review_length, self.config.review_count)

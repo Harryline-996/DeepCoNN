@@ -80,8 +80,8 @@ if __name__ == '__main__':
     word2vec = KeyedVectors.load_word2vec_format('data/embedding/GoogleNews-vectors-negative300.bin', binary=True)
 
     train_dataset = DeepCoNNDataset('data/music/train.csv', word2vec, config)
-    valid_dataset = DeepCoNNDataset('data/music/valid.csv', word2vec, config)
-    test_dataset = DeepCoNNDataset('data/music/test.csv', word2vec, config)
+    valid_dataset = DeepCoNNDataset('data/music/valid.csv', word2vec, config, retain_rui=False)
+    test_dataset = DeepCoNNDataset('data/music/test.csv', word2vec, config, retain_rui=False)
     train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True)
     valid_dataloader = DataLoader(valid_dataset, batch_size=config.batch_size, shuffle=True)
     test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=True)
