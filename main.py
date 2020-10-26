@@ -14,7 +14,7 @@ def date():
     return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
 
 
-def predicting(model, dataloader):
+def predict_mse(model, dataloader):
     mse, sample_count = 0, 0
     with torch.no_grad():
         for batch in dataloader:
@@ -27,8 +27,8 @@ def predicting(model, dataloader):
 
 def train(train_dataloader, valid_dataloader, model, config, model_path):
     print(f'{date()}## Start the training!')
-    train_mse = predicting(model, train_dataloader)
-    valid_mse = predicting(model, valid_dataloader)
+    train_mse = predict_mse(model, train_dataloader)
+    valid_mse = predict_mse(model, valid_dataloader)
     print(f'{date()}#### Initial train mse {train_mse:.6f}, validation mse {valid_mse:.6f}')
     start_time = time.perf_counter()
 
@@ -51,7 +51,7 @@ def train(train_dataloader, valid_dataloader, model, config, model_path):
             total_samples += len(predict)
 
         model.eval()  # 停止训练状态
-        valid_mse = predicting(model, valid_dataloader)
+        valid_mse = predict_mse(model, valid_dataloader)
         train_loss = total_loss / total_samples
         print(f"{date()}#### Epoch {epoch:3d}; train mse {train_loss:.6f}; validation mse {valid_mse:.6f}")
 
@@ -68,7 +68,7 @@ def test(dataloader, model_path):
     start_time = time.perf_counter()
 
     best_model = torch.load(model_path)
-    test_loss = predicting(best_model, dataloader)
+    test_loss = predict_mse(best_model, dataloader)
 
     end_time = time.perf_counter()
     print(f"{date()}## Test end, test ems is {test_loss:.6f}, time used {end_time - start_time:.0f} seconds.")
@@ -78,18 +78,19 @@ if __name__ == '__main__':
     config = Config()
     print(f'{date()}## Load embedding and data...')
     word2vec = KeyedVectors.load_word2vec_format('data/embedding/GoogleNews-vectors-negative300.bin', binary=True)
+    word_emb = word2vec.vectors
+    word_dict = {w: i.index for w, i in word2vec.vocab.items()}
+    del word2vec
 
-    train_dataset = DeepCoNNDataset('data/music/train.csv', word2vec, config)
-    valid_dataset = DeepCoNNDataset('data/music/valid.csv', word2vec, config, retain_rui=False)
-    test_dataset = DeepCoNNDataset('data/music/test.csv', word2vec, config, retain_rui=False)
+    train_dataset = DeepCoNNDataset('data/music/train.csv', word_dict, config)
+    valid_dataset = DeepCoNNDataset('data/music/valid.csv', word_dict, config, retain_rui=False)
+    test_dataset = DeepCoNNDataset('data/music/test.csv', word_dict, config, retain_rui=False)
     train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True)
     valid_dataloader = DataLoader(valid_dataset, batch_size=config.batch_size, shuffle=True)
     test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=True)
     del train_dataset, valid_dataset, test_dataset
 
-    model = DeepCoNN(config, word2vec).to(config.device)
-    # model = torch.load('model/best_model.pt')  # 继续训练以前的模型
-    del word2vec  # 节省空间
+    model = DeepCoNN(config, word_emb).to(config.device)
     os.makedirs('model', exist_ok=True)  # 文件夹不存在则创建
     train(train_dataloader, valid_dataloader, model, config, 'model/best_model.pt')
     test(test_dataloader, 'model/best_model.pt')

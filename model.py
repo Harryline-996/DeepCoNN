@@ -5,22 +5,25 @@ from torch.utils.data import Dataset
 
 
 class DeepCoNNDataset(Dataset):
-    def __init__(self, data_path, word2vec, config, retain_rui=True):
-        self.word2vec = word2vec
+    def __init__(self, data_path, word_dict, config, retain_rui=True):
+        self.word_dict = word_dict
         self.config = config
         self.retain_rui = retain_rui  # 是否在最终样本中，保留user和item的公共review
-        self.PAD_WORD_idx = self.word2vec.vocab[self.config.PAD_WORD].index
+        self.PAD_WORD_idx = self.word_dict[config.PAD_WORD]
+        self.review_length = config.review_length
+        self.review_count = config.review_count
+        self.lowest_r_count = config.lowest_review_count  # lowest amount of reviews wrote by exactly one user/item
 
         df = pd.read_csv(data_path, header=None, names=['userID', 'itemID', 'review', 'rating'])
         df['review'] = df['review'].apply(self._review2id)  # 分词->数字
-        self.null_idx = set()  # 暂存空样本的下标，最后删除他们
+        self.sparse_idx = set()  # 暂存稀疏样本的下标，最后删除他们
         user_reviews = self._get_reviews(df)  # 收集每个user的评论列表
         item_reviews = self._get_reviews(df, 'itemID', 'userID')
         rating = torch.Tensor(df['rating'].to_list()).view(-1, 1)
 
-        self.user_reviews = user_reviews[[idx for idx in range(user_reviews.shape[0]) if idx not in self.null_idx]]
-        self.item_reviews = item_reviews[[idx for idx in range(item_reviews.shape[0]) if idx not in self.null_idx]]
-        self.rating = rating[[idx for idx in range(rating.shape[0]) if idx not in self.null_idx]]
+        self.user_reviews = user_reviews[[idx for idx in range(user_reviews.shape[0]) if idx not in self.sparse_idx]]
+        self.item_reviews = item_reviews[[idx for idx in range(item_reviews.shape[0]) if idx not in self.sparse_idx]]
+        self.rating = rating[[idx for idx in range(rating.shape[0]) if idx not in self.sparse_idx]]
 
     def __getitem__(self, idx):
         return self.user_reviews[idx], self.item_reviews[idx], self.rating[idx]
@@ -38,9 +41,9 @@ class DeepCoNNDataset(Dataset):
                 reviews = df_data['review'].to_list()  # 取lead所有评论：列表
             else:
                 reviews = df_data['review'][df_data[costar] != costar_id].to_list()  # 不含lead与costar的公共评论
-            if len(reviews) < 5:
-                self.null_idx.add(idx)
-            reviews = self._adjust_review_list(reviews, self.config.review_length, self.config.review_count)
+            if len(reviews) < self.lowest_r_count:
+                self.sparse_idx.add(idx)
+            reviews = self._adjust_review_list(reviews, self.review_length, self.review_count)
             lead_reviews.append(reviews)
         return torch.LongTensor(lead_reviews)
 
@@ -49,22 +52,22 @@ class DeepCoNNDataset(Dataset):
         reviews = [r[:r_length] + [0] * (r_length - len(r)) for r in reviews]  # 每条评论定长
         return reviews
 
-    def _review2id(self, review):  #  将一个评论字符串分词并转为数字
+    def _review2id(self, review):  # 将一个评论字符串分词并转为数字
         if not isinstance(review, str):
             return []  # 貌似pandas的一个bug，读取出来的评论如果是空字符串，review类型会变成float
         wids = []
         for word in review.split():
-            if word in self.word2vec:
-                wids.append(self.word2vec.vocab[word].index)  # 单词映射为数字
+            if word in self.word_dict:
+                wids.append(self.word_dict[word])  # 单词映射为数字
             else:
                 wids.append(self.PAD_WORD_idx)
         return wids
 
 
-class Net(nn.Module):
+class CNN(nn.Module):
 
     def __init__(self, config, word_dim):
-        super(Net, self).__init__()
+        super(CNN, self).__init__()
 
         self.kernel_count = config.kernel_count
         self.review_count = config.review_count
@@ -108,11 +111,11 @@ class FactorizationMachine(nn.Module):
 
 class DeepCoNN(nn.Module):
 
-    def __init__(self, config, word2vec):
+    def __init__(self, config, word_emb):
         super(DeepCoNN, self).__init__()
-        self.embedding = nn.Embedding.from_pretrained(torch.Tensor(word2vec.vectors))
-        self.Net_u = Net(config, word_dim=word2vec.vector_size)
-        self.Net_i = Net(config, word_dim=word2vec.vector_size)
+        self.embedding = nn.Embedding.from_pretrained(torch.Tensor(word_emb))
+        self.cnn_u = CNN(config, word_dim=self.embedding.embedding_dim)
+        self.cnn_i = CNN(config, word_dim=self.embedding.embedding_dim)
         self.fm = FactorizationMachine(config.cnn_out_dim * 2, 10)
 
     def forward(self, user_review, item_review):  # input shape(batch_size, review_count, review_length)
@@ -123,8 +126,8 @@ class DeepCoNN(nn.Module):
         u_vec = self.embedding(user_review)
         i_vec = self.embedding(item_review)
 
-        user_latent = self.Net_u(u_vec)
-        item_latent = self.Net_i(i_vec)
+        user_latent = self.cnn_u(u_vec)
+        item_latent = self.cnn_i(i_vec)
 
         concat_latent = torch.cat((user_latent, item_latent), dim=1)
         prediction = self.fm(concat_latent)
