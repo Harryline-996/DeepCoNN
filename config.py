@@ -12,8 +12,8 @@ class Config:
     learning_rate_decay = 0.99  # 学习率衰减程度
 
     review_count = 10  # max review count
-    review_length = 80  # max review length
-    lowest_review_count = 5  # reviews wrote by a user/item will be delete if its amount less than such value.
+    review_length = 40  # max review length
+    lowest_review_count = 2  # reviews wrote by a user/item will be delete if its amount less than such value.
     PAD_WORD = '</s>'
 
     kernel_count = 100

@@ -10,8 +10,8 @@ from config import Config
 from model import DeepCoNNDataset, DeepCoNN
 
 
-def date():
-    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+def date(format='%Y-%m-%d %H:%M:%S'):
+    return time.strftime(format, time.localtime())
 
 
 def predict_mse(model, dataloader):
@@ -80,17 +80,18 @@ if __name__ == '__main__':
     word2vec = KeyedVectors.load_word2vec_format('data/embedding/GoogleNews-vectors-negative300.bin', binary=True)
     word_emb = word2vec.vectors
     word_dict = {w: i.index for w, i in word2vec.vocab.items()}
-    del word2vec
 
     train_dataset = DeepCoNNDataset('data/music/train.csv', word_dict, config)
     valid_dataset = DeepCoNNDataset('data/music/valid.csv', word_dict, config, retain_rui=False)
     test_dataset = DeepCoNNDataset('data/music/test.csv', word_dict, config, retain_rui=False)
-    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True)
-    valid_dataloader = DataLoader(valid_dataset, batch_size=config.batch_size, shuffle=True)
-    test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=True)
-    del train_dataset, valid_dataset, test_dataset
+    train_dlr = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True)
+    valid_dlr = DataLoader(valid_dataset, batch_size=config.batch_size, shuffle=True)
+    test_dlr = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=True)
 
     model = DeepCoNN(config, word_emb).to(config.device)
+    del train_dataset, valid_dataset, test_dataset, word2vec, word_emb, word_dict
+
     os.makedirs('model', exist_ok=True)  # 文件夹不存在则创建
-    train(train_dataloader, valid_dataloader, model, config, 'model/best_model.pt')
-    test(test_dataloader, 'model/best_model.pt')
+    model_Path = 'model/best_model.pt'
+    train(train_dlr, valid_dlr, model, config, model_Path)
+    test(test_dlr, model_Path)
