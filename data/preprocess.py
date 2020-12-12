@@ -21,9 +21,9 @@ def process_dataset(json_path, select_cols, train_rate, csv_path):
     df['userID'] = df.groupby(df['userID']).ngroup()
     df['itemID'] = df.groupby(df['itemID']).ngroup()
 
-    with open('../embedding/stopwords.txt') as f:  # stop words
+    with open('stopwords.txt') as f:  # stop words
         stop_words = set(f.read().splitlines())
-    with open('../embedding/punctuations.txt') as f:  # useless punctuations
+    with open('punctuations.txt') as f:  # useless punctuations
         punctuations = set(f.read().splitlines())
 
     def clean_review(review):  # clean a review using stop words and useless punctuations
